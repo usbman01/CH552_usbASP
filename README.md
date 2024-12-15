@@ -6,7 +6,7 @@ A CH552 version of the popular usbasp from fischl. The code is mostly based on v
   - CH552
   - CH554
 
-Usbasp is on new USB Ports (3.1) much more stable because it no longer depends on VUSB. On windows machines it can automatically load winusb as driver so no more installation issues and hassles with zadig. If there is already a usbasp installation onthe PC with libusb, libusb will used. On Linux always libusb wil be used because WCID is windows only.
+Usbasp is on new USB Ports (3.1) much more stable because it no longer depends on VUSB. On windows machines it can automatically load winusb as driver so no more installation issues and hassles with zadig. If there is already a usbasp installation on the PC with libusb, libusb will be used. On Linux always libusb wil be used because WCID is windows only.
 
 ## Features:
 
