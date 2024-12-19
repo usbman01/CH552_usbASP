@@ -18,6 +18,10 @@
 extern uint8_t  UsbConfig;
 extern void usbInit(void); 
 
+#ifdef __SDCC_mcs51
+  void Usb_IRQ (void) __interrupt (INT_NO_USB);
+#endif
+
 void main(void) 
 {
     clockInit();

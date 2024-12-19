@@ -95,7 +95,7 @@ uint8_t tpi_recv_byte(void)
       tpi_bit(1); 
 	 	  return 0;
 	 }
-	 //dIn = 0;
+	 dIn = 0;
 	 for (i=0;i<8;i++)
 	 {
 	 	  dIn   >>= 1;	
