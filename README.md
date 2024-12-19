@@ -28,7 +28,7 @@ When using the compound version including CDC its neccessary to use avrdude-v8.0
  - make usbdrv usb2cv compilant
  - finish CDC support
  - switch to 24MHz fsys so CDC can work up to 115k2 baud
- - complete SDCC support (build) 
+ - complete SDCC support (build) ✔
  - use that extra opcode for memcpy functions 
 
 ## References:
