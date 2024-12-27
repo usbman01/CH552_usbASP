@@ -33,8 +33,8 @@ When using the compound version including CDC its neccessary to use avrdude-v8.0
 
 ## References:
 
- - Datasheet: https://www.wch-ic.com/downloads/CH552DS1_PDF.html
- - Isptool:   https://www.wch-ic.com/downloads/WCHISPTool_Setup_exe.html
- - usbasp:    https://www.fischl.de/usbasp/
- - v1.8:      https://github.com/nerdralph/usbasp
- - avrdude:   https://github.com/avrdudes/avrdude/releases
+ - Datasheet:  https://www.wch-ic.com/downloads/CH552DS1_PDF.html
+ - Isptool:    https://www.wch-ic.com/downloads/WCHISPTool_Setup_exe.html
+ - usbasp 1.4: https://www.fischl.de/usbasp/
+ - usbasp 1.8: https://github.com/nerdralph/usbasp
+ - avrdude:    https://github.com/avrdudes/avrdude/releases
