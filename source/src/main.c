@@ -17,7 +17,6 @@
 
 extern uint8_t  UsbConfig;
 extern void usbInit(void); 
-
 #ifdef __SDCC_mcs51
   void Usb_IRQ (void) __interrupt (INT_NO_USB);
 #endif
@@ -25,7 +24,7 @@ extern void usbInit(void);
 void main(void) 
 {
     clockInit();
-    clockWait(10 / 0.320);              // 10ms
+    clockWait(1000 / 32);              // 10ms
 
  	  SPI_TO_INPUT();
     RST_TO_INPUT();

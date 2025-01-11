@@ -29,7 +29,7 @@ static void delay(uint16_t wait)
 /**
  * exchange one bit
  */
-static BIT tpi_bit (BIT t)
+static uint8_t tpi_bit (uint8_t t)
 {
 	 TPIDATA = t; 
 	 delay(tpi_dly_cnt);

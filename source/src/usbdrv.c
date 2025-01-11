@@ -10,7 +10,19 @@
 #endif
 
 //*************************************************************
-#ifdef __C51__            // keil c51
+#ifdef __RC51__            // rc51
+//*************************************************************
+  xdata at 0x0000 uint8_t EP0_Buffer[EP0_SIZE + 2];
+  xdata at 0x0030 uint8_t serno[30];
+  xdata at 0x0080 uint8_t EP2_OutBuffer[BULK_SIZE];
+  xdata at 0x00C0 uint8_t EP2_InBuffer [BULK_SIZE];
+  xdata at 0x0100 uint8_t tx_buffer[CDC_BUFSIZE];
+  xdata at 0x0200 uint8_t rx_buffer[CDC_BUFSIZE];
+  
+  extern uint32_t htonl(uint32_t val);
+  extern void fastcpy8 (const uint8_t *src, uint8_t xdata *dest, uint8_t size);
+//*************************************************************
+#elif __C51__            // keil c51
 //*************************************************************
   uint8_t  xdata EP0_Buffer[EP0_SIZE + 2] _at_ 0x0000;
   uint8_t  xdata serno[30]                _at_ 0x0042;
@@ -18,7 +30,9 @@
   uint8_t  xdata EP2_InBuffer [BULK_SIZE] _at_ 0x00C0;
   uint8_t  xdata tx_buffer[CDC_BUFSIZE]   _at_ 0x0100;
   uint8_t  xdata rx_buffer[CDC_BUFSIZE]   _at_ 0x0200;
+  
   extern uint32_t htonl(uint32_t val);
+  extern void fastcpy8 (const uint8_t *src, uint8_t xdata *dest, uint8_t size);
 //*************************************************************
 #elif __SDCC_mcs51         // SDCC
 //*************************************************************
@@ -28,21 +42,31 @@
   __xdata __at (0x00C0) uint8_t  EP2_InBuffer [BULK_SIZE];
   __xdata __at (0x0100) uint8_t  tx_buffer[CDC_BUFSIZE];
   __xdata __at (0x0200) uint8_t  rx_buffer[CDC_BUFSIZE];
+  extern void fastcpy8 (const uint8_t *src, uint8_t XDATA *dest, uint8_t size);
+//*************************************************************
+#elif __IAR_SYSTEMS_ICC__ // IAR EW8051
+//*************************************************************
+  __xdata __no_init uint8_t  EP0_Buffer[EP0_SIZE + 2] @0x0000; 
+  __xdata __no_init uint8_t  serno[30]                @0x0042;
+  __xdata __no_init uint8_t  EP2_OutBuffer[BULK_SIZE] @0x0080;
+  __xdata __no_init uint8_t  EP2_InBuffer [BULK_SIZE] @0x00C0;
+  __xdata __no_init uint8_t  tx_buffer[CDC_BUFSIZE]   @0x0100;
+  __xdata __no_init uint8_t  rx_buffer[CDC_BUFSIZE]   @0x0200;
+  extern void fastcpy8 (const uint8_t __generic *src, uint8_t XDATA *dest, uint8_t size);
 //*************************************************************
 #else
-//*************************************************************
   #error unknown compiler
 #endif
 
 // usb vars
 tSETUP    Setup;          /**< holding the setup packet */
 uint8_t   UsbConfig;      /**< config value here 1 after the device is configured */
-//uint8_t   UsbState;     /**< the actual enum state */
+#ifdef __IAR_SYSTEMS_ICC__
+uint8_t   bRequestError;  /**< indicates any unknown or unsupported request */
+uint8_t   bFischl;        /**< can be used to switch vendor string */
+#else
 BIT       bRequestError;  /**< indicates any unknown or unsupported request */
 BIT       bFischl;        /**< can be used to switch vendor string */
-
-#if(USE_CDC)
-  line_t LineCoding;
 #endif
 
 #define CBYTE ((uint8_t volatile CODE  *) 0)
@@ -50,13 +74,12 @@ BIT       bFischl;        /**< can be used to switch vendor string */
 // usb interfaces
 #define USBASP_INTERFACE        0
 #if(USE_CDC)
-  #define CDC_CTL_INTERFACE0    1 // and USB_SET_INTERFACE /USB_GET_INTERFACE
+  #define CDC_CTL_INTERFACE0    1 // and USB_SET_INTERFACE, USB_GET_INTERFACE
   #define CDC_STREAM_INTERFACE0 2 // and _CLASS requests
+  line_t LineCoding;
 #endif
 
 uint8_t prog_sck;
-
-//static uint8_t  prog_state;// = PROG_STATE_IDLE;
 static uint8_t  prog_address_newmode;
 static uint32_t prog_address;
 static uint16_t prog_nbytes;
@@ -66,19 +89,23 @@ static uint8_t  prog_pagecounter;
 
 extern uint16_t tpi_dly_cnt; //todo move it
 
+// const is just for satisfy IAR
 #if (USE_CDC)
-   CODE uint8_t alpha[16] = {'0','1','2','3','4','5','6','7',
-                             '8','9','A','B','C','D','E','F'};
+   const uint8_t CODE alpha[16] = {'0','1','2','3','4','5','6','7',
+                                   '8','9','A','B','C','D','E','F'};
 #endif
 #if (USE_WCID)
-   CODE uint8_t VendorDesc[170] =
+   const uint8_t CODE VendorDesc[170] =
    {
        10,0,             // wLength
        0,0,              // header
        0,0,3,6,          // OS
+#ifdef __RC51__
+       170,0,
+#else      
        sizeof (VendorDesc) & 0xFF,
        sizeof (VendorDesc) >> 8,
-
+#endif
        8,0,
        2,0,              // MS_OS_20_SUBSET_HEADER_FUNCTION
        USBASP_INTERFACE, // bFirstInterface == interface 0
@@ -112,11 +139,15 @@ extern uint16_t tpi_dly_cnt; //todo move it
        0,0
    };
 
-   CODE uint8_t BosDesc[40] =
+   const uint8_t CODE BosDesc[40] =
    {
        5,0x0F,                 // bLength + BOS see 3.0 Spec page 357
+#ifdef __RC51__
+       40,0,
+#else      
        sizeof(BosDesc) & 0xFF, // wTotalLengtn
        sizeof(BosDesc) >> 8,
+#endif
        2,                      // 2 sets (Extension Desc + MS OS Desc)
    //USB2 Extension Descriptor (set no 1)
        7,0x10,                 // blength + DEVICE_CAPABILITY see 3.0 Spec page 357
@@ -140,7 +171,7 @@ extern uint16_t tpi_dly_cnt; //todo move it
        0                       // reserved
    };
 
-   CODE uint8_t DevDesc[18] =
+   const uint8_t CODE DevDesc[18] =
    {
       sizeof(DeviceDescriptor), USB_DEVICE_DESCRIPTOR,
       0x210 & 0xFF, 0x210 >> 8,   // USB 2.1 (2.0 with extensions)
@@ -168,7 +199,7 @@ extern uint16_t tpi_dly_cnt; //todo move it
       1                           // 1 configuration
    };
 #else
-   CODE uint8_t DevDesc[18] =
+   const uint8_t CODE DevDesc[18] =
    {
       sizeof(DeviceDescriptor), USB_DEVICE_DESCRIPTOR,
       //BCD_USB & 0xFF, BCD_USB >> 8,
@@ -198,14 +229,18 @@ extern uint16_t tpi_dly_cnt; //todo move it
 #endif
 
 #if (USE_CDC)
-   CODE uint8_t CfgDesc[   sizeof (ConfigurationDescriptor)+
+   const uint8_t CODE CfgDesc[   sizeof (ConfigurationDescriptor)+
                                3*sizeof (InterfaceDescriptor)    +
                                3*sizeof (EndpointDescriptor)     +
                                1* 8 +19 //1 IAD + 3*5 +4
                        ] =
    {
       sizeof (ConfigurationDescriptor), USB_CONFIGURATION_DESCRIPTOR,
+#ifdef __RC51__
+      84,0,
+#else
       sizeof (CfgDesc) & 0xFF, sizeof (CfgDesc) >> 8,
+#endif
       3,                              // 3 Interfaces
       1,                              // Configuration Value
       USB_STRING_UNDEFINED,           // Iconfig
@@ -279,22 +314,24 @@ extern uint16_t tpi_dly_cnt; //todo move it
       2 | _DEVICE,                // ep2 out
       EP_BULK,                    // bulk
       BULK_SIZE & 0xFF,BULK_SIZE >> 8,
-      //0x40,0x00,
       0x00,                       // interval
 
       sizeof(EndpointDescriptor),USB_ENDPOINT_DESCRIPTOR,
       2 | _HOST,                  // ep2 In
       EP_BULK,                    // bulk
       BULK_SIZE & 0xFF,BULK_SIZE >> 8,
-      //0x40,0x00,
       0x00                        // interval
    };
 
 #else
-   CODE uint8_t CfgDesc[18] =
+   const uint8_t CODE CfgDesc[18] =
    {
       sizeof (ConfigurationDescriptor), USB_CONFIGURATION_DESCRIPTOR,
+#ifdef __RC51__
+      18,0,
+#else      
       sizeof (CfgDesc) & 0xFF, sizeof (CfgDesc) >> 8,
+#endif
       1,                              // 1 Interfaces
       1,                              // Configuration Value
       USB_STRING_UNDEFINED,           // Iconfig
@@ -313,29 +350,45 @@ extern uint16_t tpi_dly_cnt; //todo move it
    };
 #endif
 
-CODE uint8_t Lang_Desc[4] =
+const uint8_t CODE Lang_Desc[4] =
 {
+#ifdef __RC51__
+   4,USB_STRING_DESCRIPTOR,
+#else   
    sizeof(Lang_Desc),USB_STRING_DESCRIPTOR,
+#endif   
    9,4
 };
 
-CODE uint8_t fischl_Desc[28] =
+const uint8_t CODE fischl_Desc[28] =
 {
+#ifdef __RC51__
+   28,USB_STRING_DESCRIPTOR,
+#else   
    sizeof(fischl_Desc),USB_STRING_DESCRIPTOR,
+#endif   
    'w',0,'w',0,'w',0,'.',0,'f',0,'i',0,'s',0,'c',0,'h',0,'l',0,'.',0,'d',0,'e',0
 };
 
-CODE uint8_t usbman_Desc[72] =
+const uint8_t CODE usbman_Desc[72] =
 {
+#ifdef __RC51__
+   72,USB_STRING_DESCRIPTOR,
+#else
    sizeof(usbman_Desc),USB_STRING_DESCRIPTOR,
+#endif
    'w',0,'w',0,'w',0,'.',0,'g',0,'i',0,'t',0,'h',0,'u',0,'b',0,'.',0,
    'c',0,'o',0,'m',0,'/',0,'u',0,'s',0,'b',0,'m',0,'a',0,'n',0,'1',0,
    '/',0,'C',0,'H',0,'5',0,'5',0,'2',0,'_',0,'u',0,'s',0,'b',0,'A',0,'S',0,'P',0
 };
 
-CODE uint8_t Prod_Desc[14] =
+const uint8_t CODE Prod_Desc[14] =
 {
+#ifdef __RC51__
+   14,USB_STRING_DESCRIPTOR, 
+#else   
    sizeof(Prod_Desc),USB_STRING_DESCRIPTOR,
+#endif
    'U',0,'S',0,'B',0,'a',0,'s',0,'p',0
 };
 
@@ -370,33 +423,29 @@ CODE uint8_t Prod_Desc[14] =
   void Init_LineSettings(void) //todo move it
   {
      LineCoding.s.dwDTERate   = 9600L;
-#ifdef BIG_ENDIAN_
-     //LineCoding.s.dwDTERate = htonl(LineCoding.s.dwDTERate);
-#endif
      LineCoding.s.bCharFormat = 0;
      LineCoding.s.bParityType = 0;
      LineCoding.s.bDataBits   = 8;
   }
-
 #endif
 
 void usbInit(void)
 {
     USB_CTRL   = 0;
-    #if(USE_CDC)
-      Init_UsbSerialNo();
-      Init_LineSettings();
-      UEP2_3_MOD = bUEP2_RX_EN | bUEP2_TX_EN;
-    #else
-      UEP2_3_MOD = 0;
-    #endif
+#if(USE_CDC)
+    Init_UsbSerialNo();
+    Init_LineSettings();
+    UEP2_3_MOD = bUEP2_RX_EN | bUEP2_TX_EN;
+#else
+    UEP2_3_MOD = 0;
+#endif
     UEP4_1_MOD = 0;
     UEP0_DMA_H = ((uint16_t) &EP0_Buffer[0]) >> 8;
     UEP0_DMA_L = ((uint16_t) &EP0_Buffer[0]) & 0xFF;
-    #if(USE_CDC)
-      UEP2_DMA_H = ((uint16_t) &EP2_OutBuffer[0]) >> 8;
-      UEP2_DMA_L = ((uint16_t) &EP2_OutBuffer[0]) & 0xFF;
-    #endif
+#if(USE_CDC)
+    UEP2_DMA_H = ((uint16_t) &EP2_OutBuffer[0]) >> 8;
+    UEP2_DMA_L = ((uint16_t) &EP2_OutBuffer[0]) & 0xFF;
+#endif
     UEP2_CTRL  = UEP_T_RES_NAK;
     USB_CTRL   = bUC_DEV_PU_EN | bUC_INT_BUSY | bUC_DMA_EN;
     UDEV_CTRL  = bUD_PD_DIS | bUD_PORT_EN;
@@ -408,13 +457,20 @@ void usbInit(void)
   void Usb_IRQ (void) interrupt INT_NO_USB
 #elif __SDCC_mcs51
   void Usb_IRQ (void) __interrupt (INT_NO_USB)
+#elif __IAR_SYSTEMS_ICC__
+  #pragma vector = INT_ADDR_USB
+  __interrupt void Usb_IRQ (void) 
 #endif
 {
+#ifdef __IAR_SYSTEMS_ICC__   // hack for stupid IAR
+   static const  __generic uint8_t  *ptr;
+#else   
    static const uint8_t  *ptr;
+#endif   
    //uint8_t rxlen;
    uint8_t i;
    //uint8_t status=0;  // init to zero because of SDCC warning
-   uint8_t len = 0;     // todo this just works for descriptor sets < 256 bytes
+   uint8_t len = 0;
    if(UIF_TRANSFER)
    {  // transfer interrupt
       switch (USB_INT_ST & (MASK_UIS_TOKEN | MASK_UIS_ENDP))
@@ -450,14 +506,14 @@ void usbInit(void)
                                {
                                   case USB_DEVICE_DESCRIPTOR:
                                        {
-                                          ptr  = &DevDesc[0];
+                                          ptr  = (const uint8_t *)&DevDesc[0];
                                           //len  = DevDesc[0];
                                           len = sizeof(DevDesc);
                                        }
                                        break;
                                   case USB_CONFIGURATION_DESCRIPTOR:
                                        {
-                                           ptr = &CfgDesc[0];
+                                           ptr = (const uint8_t *)&CfgDesc[0];
                                            //len = CfgDesc[2]; //dodo just ok if size <= 255 bytes
                                            len = sizeof(CfgDesc);
                                        }
@@ -467,30 +523,30 @@ void usbInit(void)
                                           switch (Setup.wValueLo)
                                           {
                                              case 0:
-                                                  ptr = &Lang_Desc[0];
+                                                  ptr = (const uint8_t *)&Lang_Desc[0];
                                                   //len = Lang_Desc[0];
                                                   len = sizeof(Lang_Desc);
                                                   break;
                                              case 1:
                                                   if (bFischl)
                                                   {
-                                                     ptr = &fischl_Desc[0];
+                                                     ptr = (const uint8_t *)&fischl_Desc[0];
                                                      len = sizeof(fischl_Desc);
                                                   }
                                                   else
                                                   {
-                                                     ptr = &usbman_Desc[0];
+                                                     ptr = (const uint8_t *)&usbman_Desc[0];
                                                      len = sizeof(usbman_Desc);
                                                   }
                                                   break;
                                              case 2:
-                                                  ptr = &Prod_Desc[0];
+                                                  ptr = (const uint8_t *)&Prod_Desc[0];
                                                   //len = Prod_Desc[0];
                                                   len = sizeof(Prod_Desc);
                                                   break;
 #if(USE_CDC)
                                              case 3:
-                                                  ptr = &serno[0];
+                                                  ptr = (const uint8_t *) &serno[0];
                                                   len = serno[0];
                                                   break;
 #endif
@@ -503,7 +559,7 @@ void usbInit(void)
 #if(USE_WCID)
                                   case 0x0F:
                                        {
-                                          ptr = BosDesc;
+                                          ptr = (const uint8_t*)&BosDesc[0];
                                           len = sizeof(BosDesc);
                                        }
                                        break;
@@ -515,7 +571,12 @@ void usbInit(void)
                                if (Setup.wLength < len) len = Setup.wLength;
                                else Setup.wLength = len;
                                if (len > EP0_SIZE) len = EP0_SIZE;
+#if(USE_FCPY)
+                               fastcpy8(ptr,&EP0_Buffer[0],len); 
+                               ptr+=len;
+#else
                                for (i=0; i<len; i++) {EP0_Buffer[i] = *ptr++;}
+#endif
                                Setup.wLength -= len;
                                break;
                           case USB_SET_ADDRESS:
@@ -645,7 +706,7 @@ void usbInit(void)
 #ifdef BIG_ENDIAN_
                                LineCoding.s.dwDTERate = htonl(LineCoding.s.dwDTERate);  //lsb first
                                for (i=0; i<len; i++) EP0_Buffer[i] = *ptr++;
-                               LineCoding.s.dwDTERate = htonl(LineCoding.s.dwDTERate); //msb first
+                               LineCoding.s.dwDTERate = htonl(LineCoding.s.dwDTERate);  //msb first
 #else
                                for (i=0; i<len; i++) EP0_Buffer[i] = *ptr++;
 #endif
@@ -821,7 +882,7 @@ void usbInit(void)
                                   prog_nbytes  = Setup.wLength;
                                   if (Setup.wLength >= EP0_SIZE) len = EP0_SIZE;
                                   else len =  Setup.wLength;
-                                  tpi_read_block(prog_address, &EP0_Buffer[0], len);
+                                  tpi_read_block(prog_address, (uint8_t *) &EP0_Buffer[0], len);
                                   prog_address  += len;
                                   Setup.wLength -= len;
                                }
@@ -839,14 +900,17 @@ void usbInit(void)
                                { // process autoload vendor requests
                                   if (Setup.wIndexLo==0x07)
                                   {
-                                     ptr = &VendorDesc[0];
+                                     ptr = (uint8_t *) &VendorDesc[0];
                                      len = sizeof(VendorDesc);
-                                     // limit size to max wLenght
                                      if (Setup.wLength < len) len = Setup.wLength;
                                      else Setup.wLength = len;
-                                     // EP0_SIZE packets
                                      if (len >= EP0_SIZE) len = EP0_SIZE;
-                                     for (i=0;i<len;i++)  {EP0_Buffer[i] = *ptr++;}
+#if(USE_FCPY)
+                                     fastcpy8(ptr,&EP0_Buffer[0],len); 
+                                     ptr+=len;
+#else
+                                     for (i=0; i<len; i++) {EP0_Buffer[i] = *ptr++;}
+#endif
                                      Setup.wLength -= len;
                                   }
                                }
@@ -899,7 +963,12 @@ void usbInit(void)
                        case USB_GET_DESCRIPTOR:
                             if (Setup.wLength >= EP0_SIZE) len = EP0_SIZE;
                             else len = Setup.wLength;
+#if(USE_FCPY)
+                            fastcpy8(ptr,&EP0_Buffer[0],len); 
+                            ptr+=len;
+#else
                             for (i=0; i<len; i++) {EP0_Buffer[i] = *ptr++;}
+#endif
                             Setup.wLength -= len;
                             UEP0_T_LEN     = len;
                             UEP0_CTRL     ^= bUEP_T_TOG;
@@ -949,7 +1018,7 @@ void usbInit(void)
                             {
                                if (Setup.wLength >= EP0_SIZE) len = EP0_SIZE;
                                else len = Setup.wLength;
-                               tpi_read_block(prog_address, &EP0_Buffer[0], len);
+                               tpi_read_block(prog_address, (uint8_t *)&EP0_Buffer[0], len);
                                prog_address  += len;
                                Setup.wLength -= len;
                                UEP0_T_LEN     = len;
@@ -1080,7 +1149,7 @@ void usbInit(void)
                                {
                                   if ( Setup.wLength > EP0_SIZE) len = EP0_SIZE;
                                   else len = Setup.wLength;
-                                  tpi_write_block(prog_address, &EP0_Buffer[0], len);
+                                  tpi_write_block(prog_address, (uint8_t *) &EP0_Buffer[0], len);
                                   prog_address  += len;
                                   Setup.wLength -= len;
                                   UEP0_T_LEN     = 0;
@@ -1142,3 +1211,10 @@ void usbInit(void)
    // ignore all others
    USB_INT_FG = 0xFF;
 }
+
+#ifdef __IAR_SYSTEMS_ICC__
+void fastcpy8 ( const uint8_t __generic *src, uint8_t XDATA *dest, uint8_t size)
+{
+   while(size--) *dest++ = *src++;
+}
+#endif
